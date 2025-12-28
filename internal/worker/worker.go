@@ -280,3 +280,4 @@ func (w *Worker) defaultHandler(ctx context.Context, job *models.Job) error {
 
 	return nil
 }
+

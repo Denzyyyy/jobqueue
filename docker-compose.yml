@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   postgres:
+    restart: always
     image: postgres:15
     container_name: jobqueue-postgres
     environment:
