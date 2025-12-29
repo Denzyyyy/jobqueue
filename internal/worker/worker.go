@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sync"
@@ -175,13 +176,13 @@ func (w *Worker) processJob(job *models.Job) {
 
 	// Extract job type from payload
 	var payload struct {
-		Task string `json:"task"`
+    Task string `json:"task"`
 	}
-	if err := job.Payload.UnmarshalJSON(job.Payload); err != nil {
-		log.Printf("[%s] Failed to parse job payload: %v", w.id, err)
-		w.failJob(job, fmt.Sprintf("invalid payload: %v", err))
-		return
-	}
+	if err := json.Unmarshal(job.Payload, &payload); err != nil {
+    	log.Printf("[%s] Failed to parse job payload: %v", w.id, err)
+    	w.failJob(job, fmt.Sprintf("invalid payload: %v", err))
+    return
+}
 
 	// Find handler
 	handler, exists := w.handlers[payload.Task]
