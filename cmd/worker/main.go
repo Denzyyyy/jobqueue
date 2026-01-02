@@ -38,6 +38,10 @@ func main() {
 	w.RegisterHandler("flaky_service", flakyServiceHandler)
 	w.RegisterHandler("always_fail", alwaysFailHandler)
 	w.RegisterHandler("random_fail", randomFailHandler)
+	w.RegisterHandler("long_running", longRunningHandler)
+
+	recovery := worker.NewLeaseRecovery(store, 10*time.Second)
+	recovery.Start()
 
 	w.Start()
 
@@ -134,3 +138,27 @@ func randomFailHandler(ctx context.Context, job *models.Job) error {
 	log.Printf("✅ Random fail - job %s succeeded!", job.ID)
 	return nil
 }
+
+// longRunningHandler simulates a job that takes 60 seconds
+func longRunningHandler(ctx context.Context, job *models.Job) error {
+	log.Printf("🕐 Long-running job %s started (will take 60 seconds)", job.ID)
+	
+	// Process in chunks so we can see progress
+	for i := 0; i < 60; i++ {
+		select {
+		case <-ctx.Done():
+			// Context cancelled (worker shutdown)
+			log.Printf("⚠️  Long-running job %s cancelled", job.ID)
+			return fmt.Errorf("job cancelled")
+		default:
+			time.Sleep(1 * time.Second)
+			if i%10 == 0 && i > 0 {
+				log.Printf("   Job %s progress: %d/60 seconds", job.ID, i)
+			}
+		}
+	}
+	
+	log.Printf("✅ Long-running job %s completed after 60 seconds", job.ID)
+	return nil
+}
+
