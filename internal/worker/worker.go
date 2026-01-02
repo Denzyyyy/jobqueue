@@ -249,7 +249,6 @@ func (w *Worker) heartbeatLoop() {
 	}
 }
 
-// sendHeartbeats extends leases for all active jobs
 func (w *Worker) sendHeartbeats() {
 	w.mu.Lock()
 	activeJobs := make([]*models.Job, 0, len(w.activeJobs))
@@ -257,17 +256,28 @@ func (w *Worker) sendHeartbeats() {
 		activeJobs = append(activeJobs, aj.job)
 	}
 	w.mu.Unlock()
-
+	
 	if len(activeJobs) == 0 {
 		return
 	}
-
-	log.Printf("[%s] Sending heartbeats for %d active jobs", w.id, len(activeJobs))
-
-	// TODO: We'll implement lease extension in storage layer
-	// For now, just log
+	
 	for _, job := range activeJobs {
-		log.Printf("[%s] Heartbeat for job %s", w.id, job.ID)
+		if job.LeaseToken == nil {
+			continue
+		}
+		
+		err := w.store.ExtendLease(
+			context.Background(),
+			job.ID,
+			*job.LeaseToken,
+			w.leaseDuration,
+		)
+		
+		if err != nil {
+			log.Printf("[%s] ⚠️  Failed to extend lease for job %s: %v", w.id, job.ID, err)
+		} else {
+			log.Printf("[%s] ✅ Extended lease for job %s", w.id, job.ID)
+		}
 	}
 }
 

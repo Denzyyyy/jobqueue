@@ -22,11 +22,16 @@ type Store interface {
 	CompleteJob(ctx context.Context, id uuid.UUID, leaseToken uuid.UUID) error
 	FailJob(ctx context.Context, id uuid.UUID, leaseToken uuid.UUID, errMsg string) error
 	ReclaimExpiredLeases(ctx context.Context) (int, error)
+	ExtendLease(ctx context.Context, id uuid.UUID, leaseToken uuid.UUID, duration time.Duration) error
 	Close() error
 }
 
 type PostgresStore struct {
 	db *sql.DB
+}
+
+func (s *PostgresStore) ExecContext(context context.Context, query string, newExpiry time.Time, d uuid.UUID, param5 uuid.UUID) (any, any) {
+	panic("unimplemented")
 }
 
 func NewPostgresStore(connStr string) (*PostgresStore, error) {
@@ -390,3 +395,29 @@ func (s *PostgresStore) ReclaimExpiredLeases(ctx context.Context) (int, error) {
 func (s *PostgresStore) Close() error {
 	return s.db.Close()
 }
+
+func (s *PostgresStore) ExtendLease(ctx context.Context, id uuid.UUID, leaseToken uuid.UUID, duration time.Duration) error {
+	newExpiry := time.Now().Add(duration)
+	
+	query := `
+		UPDATE jobs
+		SET lease_expires_at = $1
+		WHERE id = $2 
+		  AND lease_token = $3 
+		  AND status = 'running'
+	`
+	
+	result, err := s.db.ExecContext(ctx, query, newExpiry, id, leaseToken)
+	if err != nil {
+		return fmt.Errorf("failed to extend lease: %w", err)
+	}
+	
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("job not found or lease already expired")
+	}
+	
+	return nil
+}
+
+
