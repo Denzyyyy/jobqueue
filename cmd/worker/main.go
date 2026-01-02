@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"context"
 	"fmt"
 	"log"
@@ -16,7 +17,17 @@ import (
 )
 
 func main() {
+	
+	// Configuration from environment
+	workerID := getEnv("WORKER_ID", fmt.Sprintf("worker-%d", time.Now().Unix()))
+	queues := getEnv("QUEUES", "default,email")
 	dbURL := getEnv("DATABASE_URL", "postgresql://jobqueue:devpass@localhost:5432/jobqueue?sslmode=disable")
+
+	// Parse queues (comma-separated)
+	queueList := strings.Split(queues, ",")
+	for i := range queueList {
+		queueList[i] = strings.TrimSpace(queueList[i])
+	}
 
 	store, err := storage.NewPostgresStore(dbURL)
 	if err != nil {
@@ -27,7 +38,7 @@ func main() {
 	log.Println("✓ Connected to database")
 
 	w := worker.NewWorker(store, worker.Config{
-		ID:            "worker-1",
+		ID:            workerID,
 		Queues:        []string{"default", "email"},
 		LeaseDuration: 30 * time.Second,
 		PollInterval:  1 * time.Second,
